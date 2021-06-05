@@ -1,0 +1,15 @@
+[[source]]
+url = 'https://pypi.python.org/simple'
+verify_ssl = true
+
+[dev-packages]
+jupyter_ecs_service = {editable = true,path = "cdk"}
+
+[packages]
+boto3 = "*"
+dictdiffer = "*"
+mypy_boto3 = "*"
+boto3_type_annotations = "*"
+
+[requires]
+python_version = "3"
