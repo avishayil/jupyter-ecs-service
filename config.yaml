@@ -1,0 +1,12 @@
+---
+
+domain_prefix: 'dev'
+hosted_zone_id: 'XXXXXXXXXXXXXXXXXXXXX'
+hosted_zone_name: 'some-domain.com'
+
+oauth_login_service_name: 'AWS Cognito'
+oauth_login_username_key: 'username'
+oauth_scope: ['openid', 'profile']
+
+admin_temp_password: '1Qaz2wsx!'
+num_containers: 2
