@@ -26,21 +26,15 @@ class JupyterEcsServiceStack(cdk.Stack):
     def __init__(self, scope: cdk.Construct, id: str, **kwargs) -> None:
         super().__init__(scope, id, **kwargs)
 
+        # General configuration variables
+
         config_yaml = yaml.load(
             open('config.yaml'), Loader=yaml.FullLoader)
 
         domain_prefix = config_yaml['domain_prefix']
 
-        # Define User pool
-
         application_prefix = 'jupyter-' + domain_prefix
         suffix = f'secure'.lower()
-
-        cognito_user_pool = cognito.UserPool(
-            self,
-            f'{BASE_NAME}UserPool',
-            removal_policy=cdk.RemovalPolicy.DESTROY
-        )
 
         # Define IAM roles and policies
 
@@ -106,6 +100,8 @@ class JupyterEcsServiceStack(cdk.Stack):
             allow_all_outbound=True
         )
 
+        # Open ingress to the deploying computer public IP
+
         my_ip_cidr = urllib.request.urlopen(
             'http://checkip.amazonaws.com').read().decode('utf-8').strip() + '/32'
         jupyter_lb_security_group.add_ingress_rule(
@@ -161,7 +157,13 @@ class JupyterEcsServiceStack(cdk.Stack):
             kms_key=jupyter_efs_cmk
         )
 
-        # ECS clusters ALB, hosted zone records, certificates and tasks definition
+        jupyter_efs_mount_point = ecs.MountPoint(
+            container_path='/home',
+            source_volume='efs-volume',
+            read_only=False
+        )
+
+        # ECS clusters ALB, hosted zone records and certificates
 
         jupyter_cluster = ecs.Cluster(
             self, f'{BASE_NAME}Cluster',
@@ -209,6 +211,14 @@ class JupyterEcsServiceStack(cdk.Stack):
                 hosted_zone=jupyter_hosted_zone)
         )
 
+        # User pool and user pool OAuth client
+
+        cognito_user_pool = cognito.UserPool(
+            self,
+            f'{BASE_NAME}UserPool',
+            removal_policy=cdk.RemovalPolicy.DESTROY
+        )
+
         cognito_user_pool_domain = cognito.UserPoolDomain(
             self,
             f'{BASE_NAME}UserPoolDomain',
@@ -236,28 +246,6 @@ class JupyterEcsServiceStack(cdk.Stack):
             )
         )
 
-        jupyter_ecs_task_definition = ecs.FargateTaskDefinition(
-            self,
-            f'{BASE_NAME}TaskDefinition',
-            cpu=512,
-            memory_limit_mib=2048,
-            execution_role=jupyter_ecs_task_execution_role,
-            task_role=jupyter_ecs_task_role
-        )
-
-        jupyter_ecs_task_definition.add_volume(
-            name='efs-volume',
-            efs_volume_configuration=ecs.EfsVolumeConfiguration(
-                file_system_id=jupyter_efs.file_system_id
-            )
-        )
-
-        jupyter_efs_mount_point = ecs.MountPoint(
-            container_path='/home',
-            source_volume='efs-volume',
-            read_only=False
-        )
-
         describe_cognito_user_pool_client = cr.AwsCustomResource(
             self,
             f'{BASE_NAME}UserPoolClientIDResource',
@@ -275,6 +263,26 @@ class JupyterEcsServiceStack(cdk.Stack):
 
         cognito_user_pool_client_secret = describe_cognito_user_pool_client.get_response_field(
             'UserPoolClient.ClientSecret')
+
+        # ECS Task definition and volumes
+
+        jupyter_ecs_task_definition = ecs.FargateTaskDefinition(
+            self,
+            f'{BASE_NAME}TaskDefinition',
+            cpu=512,
+            memory_limit_mib=2048,
+            execution_role=jupyter_ecs_task_execution_role,
+            task_role=jupyter_ecs_task_role
+        )
+
+        jupyter_ecs_task_definition.add_volume(
+            name='efs-volume',
+            efs_volume_configuration=ecs.EfsVolumeConfiguration(
+                file_system_id=jupyter_efs.file_system_id
+            )
+        )
+
+        # ECS Container definition, service, target group and ALB attachment
 
         jupyter_ecs_container = jupyter_ecs_task_definition.add_container(
             f'{BASE_NAME}Container',
@@ -332,7 +340,7 @@ class JupyterEcsServiceStack(cdk.Stack):
                 target_groups=[jupyter_ecs_service.target_group])
         )
 
-        # Create admin users from admins file
+        # Cognito admin users from admins file
 
         with open('docker/admins') as fp:
             lines = fp.readlines()
@@ -353,9 +361,10 @@ class JupyterEcsServiceStack(cdk.Stack):
                     )
                 )
 
+        # Output the service URL to CloudFormation outputs
+
         cdk.CfnOutput(
             self,
             f'{BASE_NAME}JupyterHubURL',
-            value='https://' + jupyter_route53_record.domain_name,
-            export_name='JupyterHubURL'
+            value='https://' + jupyter_route53_record.domain_name
         )

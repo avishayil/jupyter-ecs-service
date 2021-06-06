@@ -71,7 +71,7 @@ $ cdk deploy
 ```
 
 Don't forget to approve the template and security resources before the deployment.
-By default, the template will provision 2 tasks to spawn between the availability zones for high availability.
+By default, the template will spawn 1 task. I encountered some problems when trying to spawn more than 1 task during the OAuth flow.
 If you would like to change the number of running tasks ,you can configure it in the `config.yaml` file.
 
 ### Docker
