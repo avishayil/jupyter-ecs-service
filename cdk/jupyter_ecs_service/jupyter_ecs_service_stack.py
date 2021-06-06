@@ -1,5 +1,3 @@
-# pylint: disable=E1120
-
 import yaml
 import urllib.request
 
@@ -17,15 +15,15 @@ from aws_cdk import (
     custom_resources as cr,
     aws_logs as logs,
     aws_kms as kms,
-    core
+    core as cdk
 )
 
 from constants import BASE_NAME
 
 
-class JupyterEcsServiceStack(core.Stack):
+class JupyterEcsServiceStack(cdk.Stack):
 
-    def __init__(self, scope: core.Construct, id: str, **kwargs) -> None:
+    def __init__(self, scope: cdk.Construct, id: str, **kwargs) -> None:
         super().__init__(scope, id, **kwargs)
 
         config_yaml = yaml.load(
@@ -41,7 +39,7 @@ class JupyterEcsServiceStack(core.Stack):
         cognito_user_pool = cognito.UserPool(
             self,
             f'{BASE_NAME}UserPool',
-            removal_policy=core.RemovalPolicy.DESTROY
+            removal_policy=cdk.RemovalPolicy.DESTROY
         )
 
         # Define IAM roles and policies
@@ -108,7 +106,8 @@ class JupyterEcsServiceStack(core.Stack):
             allow_all_outbound=True
         )
 
-        my_ip_cidr = urllib.request.urlopen('http://checkip.amazonaws.com').read().decode('utf-8').strip() + '/32'
+        my_ip_cidr = urllib.request.urlopen(
+            'http://checkip.amazonaws.com').read().decode('utf-8').strip() + '/32'
         jupyter_lb_security_group.add_ingress_rule(
             peer=ec2.Peer.ipv4(cidr_ip=my_ip_cidr),
             connection=ec2.Port.tcp(port=443),
@@ -147,21 +146,22 @@ class JupyterEcsServiceStack(core.Stack):
             enabled=True,
             enable_key_rotation=True,
             trust_account_identities=True,
-            removal_policy=core.RemovalPolicy.DESTROY
+            removal_policy=cdk.RemovalPolicy.DESTROY
         )
 
         jupyter_efs = efs.FileSystem(
             self,
             f'{BASE_NAME}EFS',
             vpc=jupyter_vpc,
-            vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE),
+            vpc_subnets=ec2.SubnetSelection(
+                subnet_type=ec2.SubnetType.PRIVATE),
             security_group=jupyter_efs_security_group,
-            removal_policy=core.RemovalPolicy.DESTROY,
+            removal_policy=cdk.RemovalPolicy.DESTROY,
             encrypted=True,
             kms_key=jupyter_efs_cmk
         )
 
-        # ECS clusters and tasks definition
+        # ECS clusters ALB, hosted zone records, certificates and tasks definition
 
         jupyter_cluster = ecs.Cluster(
             self, f'{BASE_NAME}Cluster',
@@ -197,20 +197,23 @@ class JupyterEcsServiceStack(core.Stack):
             f'{BASE_NAME}LBRecord',
             zone=jupyter_hosted_zone,
             record_name=application_prefix,
-            target=route53.RecordTarget(alias_target=(route53_targets.LoadBalancerTarget(jupyter_ecs_loadbalancer)))
+            target=route53.RecordTarget(alias_target=(
+                route53_targets.LoadBalancerTarget(jupyter_ecs_loadbalancer)))
         )
 
         jupyter_certificate = acm.Certificate(
             self,
             f'{BASE_NAME}Certificate',
             domain_name='*.' + jupyter_hosted_zone.zone_name,
-            validation=acm.CertificateValidation.from_dns(hosted_zone=jupyter_hosted_zone)
+            validation=acm.CertificateValidation.from_dns(
+                hosted_zone=jupyter_hosted_zone)
         )
 
         cognito_user_pool_domain = cognito.UserPoolDomain(
             self,
             f'{BASE_NAME}UserPoolDomain',
-            cognito_domain=cognito.CognitoDomainOptions(domain_prefix=application_prefix + '-' + suffix),
+            cognito_domain=cognito.CognitoDomainOptions(
+                domain_prefix=application_prefix + '-' + suffix),
             user_pool=cognito_user_pool
         )
 
@@ -219,10 +222,12 @@ class JupyterEcsServiceStack(core.Stack):
             f'{BASE_NAME}UserPoolClient',
             user_pool=cognito_user_pool,
             generate_secret=True,
-            supported_identity_providers=[cognito.UserPoolClientIdentityProvider.COGNITO],
+            supported_identity_providers=[
+                cognito.UserPoolClientIdentityProvider.COGNITO],
             prevent_user_existence_errors=True,
             o_auth=cognito.OAuthSettings(
-                callback_urls=['https://' + jupyter_route53_record.domain_name + '/hub/oauth_callback'],
+                callback_urls=[
+                    'https://' + jupyter_route53_record.domain_name + '/hub/oauth_callback'],
                 flows=cognito.OAuthFlows(
                     authorization_code_grant=True,
                     implicit_code_grant=True
@@ -256,13 +261,15 @@ class JupyterEcsServiceStack(core.Stack):
         describe_cognito_user_pool_client = cr.AwsCustomResource(
             self,
             f'{BASE_NAME}UserPoolClientIDResource',
-            policy=cr.AwsCustomResourcePolicy.from_sdk_calls(resources=cr.AwsCustomResourcePolicy.ANY_RESOURCE),
+            policy=cr.AwsCustomResourcePolicy.from_sdk_calls(
+                resources=cr.AwsCustomResourcePolicy.ANY_RESOURCE),
             on_create=cr.AwsSdkCall(
                 service='CognitoIdentityServiceProvider',
                 action='describeUserPoolClient',
                 parameters={'UserPoolId': cognito_user_pool.user_pool_id,
                             'ClientId': cognito_app_client.user_pool_client_id},
-                physical_resource_id=cr.PhysicalResourceId.of(cognito_app_client.user_pool_client_id)
+                physical_resource_id=cr.PhysicalResourceId.of(
+                    cognito_app_client.user_pool_client_id)
             )
         )
 
@@ -271,7 +278,8 @@ class JupyterEcsServiceStack(core.Stack):
 
         jupyter_ecs_container = jupyter_ecs_task_definition.add_container(
             f'{BASE_NAME}Container',
-            image=ecs.ContainerImage.from_registry('avishaybar/jupyter-ecs-service'),
+            image=ecs.ContainerImage.from_registry(
+                config_yaml['container_image']),
             privileged=False,
             port_mappings=[
                 ecs.PortMapping(
@@ -320,7 +328,8 @@ class JupyterEcsServiceStack(core.Stack):
             protocol=lb.ApplicationProtocol.HTTPS,
             port=443,
             certificates=[jupyter_certificate],
-            default_action=lb.ListenerAction.forward(target_groups=[jupyter_ecs_service.target_group])
+            default_action=lb.ListenerAction.forward(
+                target_groups=[jupyter_ecs_service.target_group])
         )
 
         # Create admin users from admins file
@@ -331,18 +340,20 @@ class JupyterEcsServiceStack(core.Stack):
                 cr.AwsCustomResource(
                     self,
                     f'{BASE_NAME}UserPoolAdminUserResource',
-                    policy=cr.AwsCustomResourcePolicy.from_sdk_calls(resources=cr.AwsCustomResourcePolicy.ANY_RESOURCE),
+                    policy=cr.AwsCustomResourcePolicy.from_sdk_calls(
+                        resources=cr.AwsCustomResourcePolicy.ANY_RESOURCE),
                     on_create=cr.AwsSdkCall(
                         service='CognitoIdentityServiceProvider',
                         action='adminCreateUser',
                         parameters={'UserPoolId': cognito_user_pool.user_pool_id,
                                     'Username': line.strip(),
                                     'TemporaryPassword': config_yaml['admin_temp_password']},
-                        physical_resource_id=cr.PhysicalResourceId.of(cognito_user_pool.user_pool_id)
+                        physical_resource_id=cr.PhysicalResourceId.of(
+                            cognito_user_pool.user_pool_id)
                     )
                 )
 
-        core.CfnOutput(
+        cdk.CfnOutput(
             self,
             f'{BASE_NAME}JupyterHubURL',
             value='https://' + jupyter_route53_record.domain_name,
