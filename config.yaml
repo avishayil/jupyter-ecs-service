@@ -6,7 +6,7 @@ hosted_zone_name: 'some-domain.com'
 
 container_image: 'avishaybar/jupyter-ecs-service'
 admin_temp_password: '1Qaz2wsx!'
-num_containers: 2
+num_containers: 1
 
 oauth_login_service_name: 'AWS Cognito'
 oauth_login_username_key: 'username'
