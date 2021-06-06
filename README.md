@@ -1,20 +1,18 @@
 
 # Welcome to Jupyter ECS Service CDK project!
 
-This is a project for deploying Jupyter Hub on ECS with CDK.
+## Motivation
 
-The `cdk.json` file tells the CDK Toolkit how to execute your app.
+I found myself using Jupyter notebooks for various use-cases:
+- Machine learning
+- Data analysis & Visualisations
+- Documentation
 
-This project is set up like a standard Python project.  The initialization
-process also creates a virtualenv within this project, stored under the `.venv`
-directory.  To create the virtualenv it assumes that there is a `python3`
-(or `python` for Windows) executable in your path with access to the `venv`
-package. If for any reason the automatic creation of the virtualenv fails,
-you can create the virtualenv manually.
+Recently, I started to work on a new project and found the need to deploy Jupyter in a way that it would be available for multiple users, authenticating with the corporate authentication tools and run notebooks without managing servers.
 
 ## Architecture
 
-The main idea behind this service is to use serverless services in order to remove the need from managing servers.
+The main idea is to use serverless services in order to remove the need from managing servers.
 This architecture is using EFS as a shared, persistent storage for storing the Jupyter notebooks.
 
 ![Jupyter on ECS Architecture](architecture.png "Jupyter on ECS Architecture")
@@ -80,7 +78,14 @@ If you would like to change the number of running tasks ,you can configure it in
 
 In order for the service to run, the ECS service containers will pull the compatible container image and provision containers according to the desired capacity.
 For your convenience, I published an image that contains the same code. However, for security concerns you will use your own image hosted on your private repository (ECR).
-You can find the updated source code on the `docker` folder and build it yourself.
+You can find the updated source code on the `docker` folder and build it yourself:
+
+```
+$ cd docker
+$ docker build -t jupyter-ecs-service .
+$ docker tag jupyter-ecs-service your-docker-repo/jupyter-ecs-service:latest
+$ docker push
+```
 
 ### Jupyter Admin User
 
@@ -91,6 +96,7 @@ However, if you're using your own docker image you can change the admin user lis
 ## Security
 
 - You should configure the admin user temporary password on the `config.yaml` file.
+- Authentication to the Jupyter hub is done by AWS Cognito user pool. When a user is logging in to the system, a user directory is automatically created for him.
 - Jupyter `Shutdown on logout` is activated, To make sure that ghost processes are closed.  
 - ECS containers are running in non-privileged mode, according to the docker best practices.
 - During the deployment time, the cdk stack will try to determine your public ip address automatically using `checkip.amazonaws.com`.

@@ -12,3 +12,5 @@ cdk.out
 
 # Environment files
 .idea
+.vscode
+pyproject.toml
