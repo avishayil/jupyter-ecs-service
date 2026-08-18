@@ -1,7 +1,11 @@
-import yaml
+import os
 import urllib.request
 
+import yaml
 from aws_cdk import (
+    Stack,
+    RemovalPolicy,
+    CfnOutput,
     aws_ec2 as ec2,
     aws_ecs as ecs,
     aws_efs as efs,
@@ -15,21 +19,31 @@ from aws_cdk import (
     custom_resources as cr,
     aws_logs as logs,
     aws_kms as kms,
-    core as cdk
 )
+from constructs import Construct
 
-from constants import BASE_NAME
+from .constants import BASE_NAME
 
 
-class JupyterEcsServiceStack(cdk.Stack):
+class JupyterEcsServiceStack(Stack):
 
-    def __init__(self, scope: cdk.Construct, id: str, **kwargs) -> None:
+    def __init__(self, scope: Construct, id: str, **kwargs) -> None:
         super().__init__(scope, id, **kwargs)
 
         # General configuration variables
 
         config_yaml = yaml.load(
             open('config.yaml'), Loader=yaml.FullLoader)
+
+        # Admin temporary password is sourced from the environment instead of
+        # being committed to config.yaml. It is a Cognito temporary password
+        # that must be changed on first login. Fail fast if it is missing.
+        admin_temp_password = os.environ.get('JUPYTER_ADMIN_TEMP_PASSWORD')
+        if not admin_temp_password:
+            raise ValueError(
+                'JUPYTER_ADMIN_TEMP_PASSWORD environment variable must be set '
+                '(this value was previously hardcoded in config.yaml).'
+            )
 
         domain_prefix = config_yaml['domain_prefix']
 
@@ -102,8 +116,12 @@ class JupyterEcsServiceStack(cdk.Stack):
 
         # Open ingress to the deploying computer public IP
 
-        my_ip_cidr = urllib.request.urlopen(
-            'http://checkip.amazonaws.com').read().decode('utf-8').strip() + '/32'
+        # Allow overriding the deployer IP (used for offline synth/tests);
+        # otherwise resolve the current public IP at synth time.
+        my_ip_cidr = os.environ.get('DEPLOYER_IP_CIDR')
+        if not my_ip_cidr:
+            my_ip_cidr = urllib.request.urlopen(
+                'http://checkip.amazonaws.com').read().decode('utf-8').strip() + '/32'
         jupyter_lb_security_group.add_ingress_rule(
             peer=ec2.Peer.ipv4(cidr_ip=my_ip_cidr),
             connection=ec2.Port.tcp(port=443),
@@ -141,8 +159,7 @@ class JupyterEcsServiceStack(cdk.Stack):
             description='CMK for EFS Encryption',
             enabled=True,
             enable_key_rotation=True,
-            trust_account_identities=True,
-            removal_policy=cdk.RemovalPolicy.DESTROY
+            removal_policy=RemovalPolicy.DESTROY
         )
 
         jupyter_efs = efs.FileSystem(
@@ -150,9 +167,9 @@ class JupyterEcsServiceStack(cdk.Stack):
             f'{BASE_NAME}EFS',
             vpc=jupyter_vpc,
             vpc_subnets=ec2.SubnetSelection(
-                subnet_type=ec2.SubnetType.PRIVATE),
+                subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
             security_group=jupyter_efs_security_group,
-            removal_policy=cdk.RemovalPolicy.DESTROY,
+            removal_policy=RemovalPolicy.DESTROY,
             encrypted=True,
             kms_key=jupyter_efs_cmk
         )
@@ -216,7 +233,7 @@ class JupyterEcsServiceStack(cdk.Stack):
         cognito_user_pool = cognito.UserPool(
             self,
             f'{BASE_NAME}UserPool',
-            removal_policy=cdk.RemovalPolicy.DESTROY
+            removal_policy=RemovalPolicy.DESTROY
         )
 
         cognito_user_pool_domain = cognito.UserPoolDomain(
@@ -355,7 +372,7 @@ class JupyterEcsServiceStack(cdk.Stack):
                         action='adminCreateUser',
                         parameters={'UserPoolId': cognito_user_pool.user_pool_id,
                                     'Username': line.strip(),
-                                    'TemporaryPassword': config_yaml['admin_temp_password']},
+                                    'TemporaryPassword': admin_temp_password},
                         physical_resource_id=cr.PhysicalResourceId.of(
                             cognito_user_pool.user_pool_id)
                     )
@@ -363,7 +380,7 @@ class JupyterEcsServiceStack(cdk.Stack):
 
         # Output the service URL to CloudFormation outputs
 
-        cdk.CfnOutput(
+        CfnOutput(
             self,
             f'{BASE_NAME}JupyterHubURL',
             value='https://' + jupyter_route53_record.domain_name

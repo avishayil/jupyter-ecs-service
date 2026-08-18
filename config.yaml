@@ -5,7 +5,8 @@ hosted_zone_id: 'XXXXXXXXXXXXXXXXXXXXX'
 hosted_zone_name: 'some-domain.com'
 
 container_image: 'avishaybar/jupyter-ecs-service'
-admin_temp_password: '1Qaz2wsx!'
+# admin_temp_password is no longer stored here — set it via the
+# JUPYTER_ADMIN_TEMP_PASSWORD environment variable at synth/deploy time.
 num_containers: 1
 
 oauth_login_service_name: 'AWS Cognito'
