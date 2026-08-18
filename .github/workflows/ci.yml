@@ -17,7 +17,7 @@ jobs:
       JUPYTER_ADMIN_TEMP_PASSWORD: CiOnlyTempPassw0rd!
       DEPLOYER_IP_CIDR: 203.0.113.10/32
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
