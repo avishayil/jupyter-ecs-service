@@ -19,24 +19,12 @@ setuptools.setup(
     packages=setuptools.find_packages(where="jupyter_ecs_service"),
 
     install_requires=[
-        "aws-cdk.core>=1.107.0",
-        "aws-cdk.aws-iam>=1.107.0",
-        "aws-cdk.aws-cognito>=1.107.0",
-        "aws-cdk.aws_ec2>=1.107.0",
-        "aws-cdk.aws_ecs>=1.107.0",
-        "aws-cdk.aws-ecs-patterns>=1.107.0",
-        "aws-cdk.aws_efs>=1.107.0",
-        "aws_cdk.aws_certificatemanager>=1.107.0",
-        "aws_cdk.aws_route53>=1.107.0",
-        "aws_cdk.aws_route53_targets>=1.107.0",
-        "aws_cdk.aws_elasticloadbalancingv2>=1.107.0",
-        "aws_cdk.aws_logs>=1.107.0",
-        "aws_cdk.aws_kms>=1.107.0",
-        "aws_cdk.custom_resources>=1.107.0",
-        "PyYAML>=5.3.1",
+        "aws-cdk-lib>=2.100.0,<3.0.0",
+        "constructs>=10.0.0,<11.0.0",
+        "PyYAML>=6.0",
     ],
 
-    python_requires=">=3.6",
+    python_requires=">=3.9",
 
     classifiers=[
         "Development Status :: 4 - Beta",
@@ -45,9 +33,11 @@ setuptools.setup(
 
         "Programming Language :: JavaScript",
         "Programming Language :: Python :: 3 :: Only",
-        "Programming Language :: Python :: 3.6",
-        "Programming Language :: Python :: 3.7",
-        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
 
         "Topic :: Software Development :: Code Generators",
         "Topic :: Utilities",

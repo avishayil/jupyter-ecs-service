@@ -24,43 +24,68 @@ This architecture is using EFS as a shared, persistent storage for storing the J
 - Domain name managed with a public hosted zone on AWS Route 53. 
   Please collect this information and fill the `config.yaml` file with the hosted zone name and hosted zone id from Route 53.
 - MacOS / Linux computer with Docker: https://docs.docker.com/get-docker/
-- NodeJS 12 or later AWS CDK command line interface installed on your computer.
-  You can easily install AWS CDK command line interface it using `npm`:
+- NodeJS 20 or later with the AWS CDK v2 command line interface installed on your computer.
+  You can easily install the AWS CDK command line interface using `npm`:
 
   ```
   $ npm install -g aws-cdk
   ```
-- Python 3.6 and up with Pipenv dependencies & virtual environment management framework.
-  You can easily install Pipenv command line interface it using `pip`:
-  
+- Python 3.9 and up. Dependencies can be managed either with plain `pip`
+  (`requirements-dev.txt`) or with Pipenv.
+
   ```
   $ pip install --upgrade pipenv
   ```
 
+### Required environment variables
+
+This project no longer stores any secrets in `config.yaml`. The following
+environment variables must be set at synth/deploy time:
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `JUPYTER_ADMIN_TEMP_PASSWORD` | Yes | Cognito temporary password assigned to the admin users listed in `docker/admins`. The stack fails fast if it is not set. It must be changed on first login. |
+| `DEPLOYER_IP_CIDR` | No | CIDR (e.g. `203.0.113.10/32`) allowed to reach the public load balancer on HTTPS. If unset, the deployer's public IP is resolved automatically via `checkip.amazonaws.com` at synth time. Set it explicitly for offline synth/CI. |
+
+```
+$ export JUPYTER_ADMIN_TEMP_PASSWORD='ChangeMeOnFirstLogin!'
+$ export DEPLOYER_IP_CIDR='203.0.113.10/32'   # optional
+```
+
 ### Preparing the CDK Environment
 
-To initiate the virtualenv on MacOS and Linux and install the required dependencies:
+This project targets **AWS CDK v2** (`aws-cdk-lib` / `constructs`).
+
+Using plain `pip` and a virtual environment:
+
+```
+$ python3 -m venv .venv
+$ source .venv/bin/activate
+$ pip install -r requirements-dev.txt
+```
+
+Alternatively, using Pipenv:
 
 ```
 $ pipenv install --dev
-```
-
-After the init process completes, and the virtualenv is created, you can use the following
-step to activate your virtualenv.
-
-```
 $ pipenv shell
 ```
 
-At this point you can now synthesize the CloudFormation template for this code.
+At this point you can synthesize the CloudFormation template for this code
+(remember to export the required environment variables first):
 
 ```
 $ cdk synth
 ```
 
-To add additional dependencies, for example other CDK libraries, just add
-them to your `setup.py` file and run `pipenv --lock && pipenv sync`
-command.
+You can run the unit tests with:
+
+```
+$ pytest --cov=cdk --cov-report=term-missing
+```
+
+To add additional dependencies, add them to `requirements.txt` /
+`cdk/setup.py` (or the `Pipfile`) and reinstall.
 
 ### Deployment
 
@@ -95,7 +120,9 @@ However, if you're using your own docker image you can change the admin user lis
 
 ## Security
 
-- You should configure the admin user temporary password on the `config.yaml` file.
+- The admin user temporary password is supplied via the `JUPYTER_ADMIN_TEMP_PASSWORD` environment variable (it is no longer stored in `config.yaml`).
+  Note that this temporary password is rendered into the synthesized CloudFormation template on the deployer's machine (it is **not** committed to this repository).
+  Treat the generated template/artifacts as sensitive, and change the password on first login.
 - Authentication to the Jupyter hub is done by AWS Cognito user pool. When a user is logging in to the system, a user directory is automatically created for him.
 - Jupyter `Shutdown on logout` is activated, To make sure that ghost processes are closed.  
 - ECS containers are running in non-privileged mode, according to the docker best practices.

@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
-import os
+import aws_cdk as cdk
 
-from aws_cdk import core as cdk
 from cdk.jupyter_ecs_service.jupyter_ecs_service_stack import JupyterEcsServiceStack
 from cdk.jupyter_ecs_service.constants import BASE_NAME
 
